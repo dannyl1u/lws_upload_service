@@ -2,8 +2,12 @@ import express from "express";
 import cors from "cors";
 import simpleGit from "simple-git";
 import path from "path";
-import fs from "fs/promises";
+import { promises as fs } from "fs";
 import { uploadFile } from "./gcs";
+import { createClient } from "redis";
+
+const publisher = createClient();
+publisher.connect();
 
 const app = express();
 app.use(cors());
@@ -28,20 +32,23 @@ async function getAllFiles(dirPath: string): Promise<string[]> {
 app.post("/upload", async (req, res) => {
     try {
         const repoUrl = req.body.repoUrl;
-        const id = Math.random().toString(36).substring(7);
-        const clonePath = path.join(__dirname, id);
+        const id = Math.random().toString(36).substring(5);
 
-        await simpleGit().clone(repoUrl, clonePath);
-        const allFiles = await getAllFiles(clonePath);
+        await simpleGit().clone(repoUrl, path.join(__dirname, `output/${id}`));
 
-        for (const file of allFiles) {
-            const relativePath = path.relative(clonePath, file);
-            await uploadFile(file, relativePath);
-        }
+        const files = await getAllFiles(path.join(__dirname, `output/${id}`));
 
-        res.send("Uploaded to GCS");
+        files.forEach(async (file: string) => {
+            await uploadFile(file, file.replace(__dirname, ""));
+        });
 
-        await fs.rm(clonePath, { recursive: true });
+        publisher.lPush("build-queue", id);
+
+        res.json({
+            id: id
+        });
+
+        // await fs.rm(``, { recursive: true });
     } catch (error) {
         console.error("Error uploading to GCS:", error);
         res.status(500).send("Failed to upload");

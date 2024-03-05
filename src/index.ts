@@ -39,10 +39,15 @@ app.post("/upload", async (req, res) => {
         const files = await getAllFiles(path.join(__dirname, `output/${id}`));
 
         files.forEach(async (file: string) => {
-            await uploadFile(file, file.replace(__dirname, ""));
+            const relativePath = path.relative(__dirname, file);
+            await uploadFile(file, relativePath);
         });
 
+        // wait for all files to be uploaded
+        await new Promise((resolve) => setTimeout(resolve, 1000));
+
         publisher.lPush("build-queue", id);
+        publisher.hSet("status", id, "uploaded");
 
         res.json({
             id: id
@@ -53,6 +58,18 @@ app.post("/upload", async (req, res) => {
         console.error("Error uploading to GCS:", error);
         res.status(500).send("Failed to upload");
     }
+});
+
+app.get("/status", async (req, res) => {
+    const id = req.query.id;
+    if (typeof id !== 'string') {
+        res.status(400).send("Invalid id");
+        return;
+    }
+    const response = await publisher.hGet("status", id);
+    res.json({
+        status: response
+    });
 });
 
 app.listen(8000, () => console.log("Server running on port 8000"));

@@ -6,7 +6,7 @@ const storage = new Storage({
 	keyFilename: './cloud_credentials.json'
 });
 
-const bucketName = "lws_bucket-1";
+const bucketName = "lws-bucket-1";
 
 export const uploadFile = async (filePath: string, fileName: string) => {
     await storage.bucket(bucketName).upload(filePath, {

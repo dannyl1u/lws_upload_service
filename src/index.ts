@@ -47,7 +47,7 @@ app.post("/upload", async (req, res) => {
         await new Promise((resolve) => setTimeout(resolve, 1000));
 
         publisher.lPush("build-queue", id);
-        publisher.hSet("status", id, "uploaded");
+        publisher.hSet("status", id, "uploading");
 
         res.json({
             id: id
